@@ -17,6 +17,7 @@ const BLACKLIST = new Set([
   ['atom', 'browser', 'notifications', 'mac', 'notification_center_delegate.h'],
   ['atom', 'browser', 'ui', 'cocoa', 'atom_menu_controller.h'],
   ['atom', 'browser', 'ui', 'cocoa', 'atom_ns_window.h'],
+  ['atom', 'browser', 'ui', 'cocoa', 'atom_access_controller.h'],
   ['atom', 'browser', 'ui', 'cocoa', 'atom_ns_window_delegate.h'],
   ['atom', 'browser', 'ui', 'cocoa', 'atom_preview_item.h'],
   ['atom', 'browser', 'ui', 'cocoa', 'atom_touch_bar.h'],
