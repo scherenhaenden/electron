@@ -51,13 +51,14 @@ async function main () {
   }
 
   // update all related files
-  await updateVersion(version)
-  await updateInfoPlist(version)
-  await updatePackageJSON(version)
-  await tagVersion(version)
-
-  // updateWinRC(version, versions, args.bump === 'nightly')
-  // updateVersionH(versions, suffix)
+  await Promise.all([
+    updateVersion(version),
+    updateInfoPlist(version),
+    updatePackageJSON(version),
+    tagVersion(version),
+    updateVersionH(versions, suffix)
+    // updateWinRC(version, versions, args.bump === 'nightly')
+  ])
 
   console.log(`Bumped to version: ${version}`)
 }
@@ -127,16 +128,32 @@ async function updateInfoPlist (version) {
   await writeFile(filePath, outFile)
 }
 
+// push bump commit to release branch
 async function tagVersion (version) {
   const gitDir = path.resolve(__dirname, '..')
   const gitArgs = ['commit', '-a', '-m', `Bump v${version}`, '-n']
   await GitProcess.exec(gitArgs, gitDir)
 }
 
-// TODO(codebytere): implement
-function updateVersionH () {
+// updates atom_version.h file with new semver values
+async function updateVersionH (parts, suffix) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'common', 'atom_version.h')
-  // parse and update the 'atom_version.h file
+  const data = await readFile(filePath, { encoding: 'utf8' })
+  const arr = data.split('\n')
+  arr.forEach((item, idx) => {
+    if (item.includes('#define ATOM_MAJOR_VERSION')) {
+      item = `#define ATOM_MAJOR_VERSION ${parts[0]}`
+      arr[idx + 1] = `#define ATOM_MINOR_VERSION ${parts[1]}`
+      arr[idx + 2] = `#define ATOM_PATCH_VERSION ${parts[2]}`
+
+      if (suffix) {
+        arr[idx + 4] = `#define ATOM_PRE_RELEASE_VERSION ${suffix}`
+      } else {
+        arr[idx + 4] = `// #define ATOM_PRE_RELEASE_VERSION`
+      }
+    }
+  })
+  await writeFile(filePath, arr.join('\n'))
 }
 
 // TODO(codebytere): implement
