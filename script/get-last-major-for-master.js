@@ -3,7 +3,7 @@ const path = require('path')
 const semver = require('semver')
 const gitDir = path.resolve(__dirname, '..')
 
-async function determineNextMajorForMaster () {
+async function getLastMajorForMaster () {
   let branchNames
   const result = await GitProcess.exec(['branch', '-a', '--remote', '--list', 'origin/[0-9]-[0-9]-x'], gitDir)
   if (result.exitCode === 0) {
@@ -23,7 +23,4 @@ function getNextReleaseBranch (branches) {
   return parseInt(next.split('.')[0], 10)
 }
 
-determineNextMajorForMaster().then(console.info).catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+module.exports = { getLastMajorForMaster }

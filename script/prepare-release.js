@@ -14,14 +14,14 @@ const pass = '\u2713'.green
 const path = require('path')
 const readline = require('readline')
 const releaseNotesGenerator = require('./release-notes/index.js')
-const versionType = args._[0]
-const targetRepo = versionType === 'nightly' ? 'nightlies' : 'electron'
+const bumpType = args._[0]
+const targetRepo = bumpType === 'nightly' ? 'nightlies' : 'electron'
 
 // TODO (future) automatically determine version based on conventional commits
 // via conventional-recommended-bump
 
-if (!versionType && !args.notesOnly) {
-  console.log(`Usage: prepare-release versionType [stable | beta | nightly]` +
+if (!bumpType && !args.notesOnly) {
+  console.log(`Usage: prepare-release [stable | beta | nightly]` +
      ` (--stable) (--notesOnly) (--automaticRelease) (--branch)`)
   process.exit(1)
 }
@@ -32,13 +32,11 @@ github.authenticate({ type: 'token', token: process.env.ELECTRON_GITHUB_TOKEN })
 
 async function getNewVersion (dryRun) {
   if (!dryRun) {
-    console.log(`Bumping for new "${versionType}" version.`)
+    console.log(`Bumping for new "${bumpType}" version.`)
   }
-  const bumpScript = path.join(__dirname, 'bump-version.py')
-  const scriptArgs = [bumpScript, '--bump', versionType]
-  if (dryRun) {
-    scriptArgs.push('--dry-run')
-  }
+  const bumpScript = path.join(__dirname, 'bump-version.js')
+  const scriptArgs = ['node', bumpScript, `--bump=${bumpType}`]
+  if (dryRun) scriptArgs.push('--dry-run')
   try {
     let bumpVersion = execSync(scriptArgs.join(' '), { encoding: 'UTF-8' })
     bumpVersion = bumpVersion.substr(bumpVersion.indexOf(':') + 1).trim()
@@ -71,7 +69,7 @@ async function getCurrentBranch (gitDir) {
 }
 
 async function getReleaseNotes (currentBranch) {
-  if (versionType === 'nightly') {
+  if (bumpType === 'nightly') {
     return 'Nightlies do not get release notes, please compare tags for info'
   }
   console.log(`Generating release notes for ${currentBranch}.`)
