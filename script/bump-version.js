@@ -15,7 +15,7 @@ function parseCommandLine () {
   let help
   const opts = minimist(process.argv.slice(2), {
     string: [ 'bump', 'version' ],
-    boolean: [ 'stable', 'dry-run', 'help' ],
+    boolean: [ 'stable', 'dryRun', 'help' ],
     alias: { 'version': ['v'] },
     unknown: arg => { help = true }
   })
@@ -44,7 +44,6 @@ async function main () {
     suffix = `-${version.split('-')[1]}`
     versions[3] = utils.parseVersion(version)[3]
   }
-  // version = version.split('-')[0]
 
   if (opts.dryRun) {
     console.log(`new version number would be: ${version}\n`)
@@ -52,8 +51,8 @@ async function main () {
   }
 
   // update all related files
-  // await updateVersion(version)
-  // await updateInfoPlist(version)
+  await updateVersion(version)
+  await updateInfoPlist(version)
   // await updatePackageJSON(version)
   // await tagVersion(version)
 
@@ -101,7 +100,7 @@ async function nextVersion (bumpType) {
 
 // update VERSION file with latest release info
 async function updateVersion (version) {
-  const versionPath = path.resolve(__dirname, '..', '..', 'VERSION')
+  const versionPath = path.resolve(__dirname, '..', 'VERSION')
   await writeFile(versionPath, version, 'utf8')
 }
 
@@ -123,14 +122,13 @@ async function updatePackageJSON (version) {
 async function updateInfoPlist (version) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'browser', 'resources', 'mac', 'Info.plist')
   const xml = plist.parse(await readFile(filePath, { encoding: 'utf8' }))
-  const file = JSON.stringify(xml)
+  const file = JSON.parse(JSON.stringify(xml))
 
   file.CFBundleVersion = version
   file.CFBundleShortVersionString = version
 
   const outFile = plist.build(file)
-
-  await writeFile(filePath, JSON.stringify(outFile))
+  await writeFile(filePath, outFile)
 }
 
 async function tagVersion (version) {
