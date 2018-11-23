@@ -47,8 +47,7 @@ async function nextBeta (v) {
   }
 
   const next = parseVersion([...tags].pop())
-  next[3]++
-  return makeVersion(next)
+  return makeVersion([next[0], next[1], next[2], ++next[3]])
 }
 
 async function getElectronVersion () {
@@ -61,7 +60,7 @@ async function nextNightly (v) {
   const pv = parseVersion(v.split('-')[0])
   let [major, minor, patch] = pv.slice(0, 3)
   const pre = `nightly.${getCurrentDate()}`
-  if (isStable(v)) patch = patch++
+  if (isStable(v)) ++patch
 
   const gitDir = path.resolve(__dirname, '..', '..')
   const branch = await GitProcess.exec(['rev-parse', '--abbrev-ref', 'HEAD'], gitDir)
@@ -80,7 +79,7 @@ function nextStableFromPre (v) {
 function nextStableFromStable (v) {
   const pv = parseVersion(v.split('-')[0])
   let [major, minor, patch] = pv.slice(0, 3)
-  return makeVersion([major, minor, patch++])
+  return makeVersion([major, minor, ++patch])
 }
 
 function makeVersion (parts) {

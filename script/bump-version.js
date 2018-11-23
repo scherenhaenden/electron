@@ -53,8 +53,8 @@ async function main () {
   // update all related files
   await updateVersion(version)
   await updateInfoPlist(version)
-  // await updatePackageJSON(version)
-  // await tagVersion(version)
+  await updatePackageJSON(version)
+  await tagVersion(version)
 
   // updateWinRC(version, versions, args.bump === 'nightly')
   // updateVersionH(versions, suffix)
@@ -109,12 +109,8 @@ async function updatePackageJSON (version) {
   ['package.json', 'package-lock.json'].forEach(async fileName => {
     const filePath = path.resolve(__dirname, '..', fileName)
     const file = require(filePath)
-
-    // set json key to updated value
     file.version = version
-
-    // write out new json file and ensure prettification
-    await writeFile(fileName, JSON.stringify(file, null, 2))
+    await writeFile(filePath, JSON.stringify(file, null, 2))
   })
 }
 
