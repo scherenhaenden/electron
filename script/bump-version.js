@@ -37,12 +37,12 @@ function parseCommandLine () {
 async function main () {
   const opts = parseCommandLine()
   const version = await nextVersion(opts.bump)
-  const versions = utils.parseVersion(version.split('-')[0])
+  const parts = utils.parseVersion(version.split('-')[0])
 
   let suffix = ''
   if (version.includes('-')) {
     suffix = `-${version.split('-')[1]}`
-    versions[3] = utils.parseVersion(version)[3]
+    parts[3] = utils.parseVersion(version)[3]
   }
 
   if (opts.dryRun) {
@@ -56,8 +56,8 @@ async function main () {
     updateInfoPlist(version),
     updatePackageJSON(version),
     tagVersion(version),
-    updateVersionH(versions, suffix)
-    // updateWinRC(version, versions, args.bump === 'nightly')
+    updateVersionH(parts, suffix),
+    updateWinRC(parts)
   ])
 
   console.log(`Bumped to version: ${version}`)
@@ -124,8 +124,7 @@ async function updateInfoPlist (version) {
   file.CFBundleVersion = version
   file.CFBundleShortVersionString = version
 
-  const outFile = plist.build(file)
-  await writeFile(filePath, outFile)
+  await writeFile(filePath, plist.build(file))
 }
 
 // push bump commit to release branch
@@ -145,22 +144,27 @@ async function updateVersionH (parts, suffix) {
       item = `#define ATOM_MAJOR_VERSION ${parts[0]}`
       arr[idx + 1] = `#define ATOM_MINOR_VERSION ${parts[1]}`
       arr[idx + 2] = `#define ATOM_PATCH_VERSION ${parts[2]}`
-
-      if (suffix) {
-        arr[idx + 4] = `#define ATOM_PRE_RELEASE_VERSION ${suffix}`
-      } else {
-        arr[idx + 4] = `// #define ATOM_PRE_RELEASE_VERSION`
-      }
+      arr[idx + 4] = suffix ? `#define ATOM_PRE_RELEASE_VERSION ${suffix}` : '// #define ATOM_PRE_RELEASE_VERSION'
     }
   })
   await writeFile(filePath, arr.join('\n'))
 }
 
-// TODO(codebytere): implement
-function updateWinRC (version, parts) {
-  const isNightly = utils.isNightly(version)
+// updates atom.rc file with new semver values
+async function updateWinRC (parts) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'browser', 'resources', 'win', 'atom.rc')
-  // parse and update the atom.rc file
+  const data = await readFile(filePath, { encoding: 'utf8' })
+  const arr = data.split('\n')
+  arr.forEach((line, idx) => {
+    if (line.includes('FILEVERSION')) {
+      arr[idx] = ` FILEVERSION ${parts.join(',')}`
+      arr[idx + 1] = ` PRODUCTVERSION ${parts.join(',')}`
+    } else if (line.includes('FILEVERSION')) {
+      arr[idx] = `            VALUE "FileVersion", "${parts.slice(0, 3).join('.')}"`
+      arr[idx + 5] = `            VALUE "ProductVersion", "${parts.slice(0, 3).join('.')}"`
+    }
+  })
+  await writeFile(filePath, arr.join('\n'))
 }
 
 if (process.mainModule === module) {
