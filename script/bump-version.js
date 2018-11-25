@@ -116,6 +116,7 @@ async function updatePackageJSON (version) {
 }
 
 // update CFBundle version information and overwrite pre-existing file
+// TODO(codebytere): provide these version fields at GN build time
 async function updateInfoPlist (version) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'browser', 'resources', 'mac', 'Info.plist')
   const xml = plist.parse(await readFile(filePath, { encoding: 'utf8' }))
@@ -135,9 +136,10 @@ async function tagVersion (version) {
 }
 
 // updates atom_version.h file with new semver values
+// TODO(codebytere): auto-generate this
 async function updateVersionH (parts, suffix) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'common', 'atom_version.h')
-  const data = await readFile(filePath, { encoding: 'utf8' })
+  const data = await readFile(filePath, 'utf8')
   const arr = data.split('\n')
   arr.forEach((item, idx) => {
     if (item.includes('#define ATOM_MAJOR_VERSION')) {
@@ -153,7 +155,7 @@ async function updateVersionH (parts, suffix) {
 // updates atom.rc file with new semver values
 async function updateWinRC (parts) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'browser', 'resources', 'win', 'atom.rc')
-  const data = await readFile(filePath, { encoding: 'utf8' })
+  const data = await readFile(filePath, 'utf8')
   const arr = data.split('\n')
   arr.forEach((line, idx) => {
     if (line.includes('FILEVERSION')) {

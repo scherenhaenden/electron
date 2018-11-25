@@ -8,8 +8,8 @@ const readFile = promisify(fs.readFile)
 
 const getCurrentDate = () => {
   const d = new Date()
-  const dd = d.getDate()
-  const mm = d.getMonth() + 1
+  const dd = `${d.getDate()}`.padStart(2, '0')
+  const mm = `${d.getMonth() + 1}`.padStart(2, '0')
   const yyyy = d.getFullYear()
   return `${yyyy}${mm}${dd}`
 }
@@ -46,14 +46,14 @@ async function nextBeta (v) {
     return makeVersion(pv[0], pv[1], pv[2], 'beta.1')
   }
 
-  const next = parseVersion([...tags].pop())
+  const next = parseVersion(tags.pop())
   return makeVersion([next[0], next[1], next[2], ++next[3]])
 }
 
 async function getElectronVersion () {
   const versionPath = path.join(__dirname, '..', '..', 'VERSION')
-  const version = await readFile(versionPath, { encoding: 'utf8' })
-  return version
+  const version = await readFile(versionPath, 'utf8')
+  return version.trim()
 }
 
 async function nextNightly (v) {
