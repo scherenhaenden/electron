@@ -36,7 +36,8 @@ function parseCommandLine () {
 // run the script
 async function main () {
   const opts = parseCommandLine()
-  const version = await nextVersion(opts.bump)
+  const currentVersion = await utils.getElectronVersion()
+  const version = await nextVersion(opts.bump, currentVersion)
   const parts = utils.parseVersion(version.split('-')[0])
 
   let suffix = ''
@@ -64,8 +65,7 @@ async function main () {
 }
 
 // get next version for release based on [nightly, beta, stable]
-async function nextVersion (bumpType) {
-  let version = await utils.getElectronVersion()
+async function nextVersion (bumpType, version) {
   if (utils.isNightly(version) || utils.isBeta(version)) {
     switch (bumpType) {
       case 'nightly':
@@ -173,3 +173,5 @@ if (process.mainModule === module) {
     process.exit(1)
   })
 }
+
+module.exports = { nextVersion }
