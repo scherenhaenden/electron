@@ -1,10 +1,12 @@
 const path = require('path')
 const fs = require('fs')
+const semver = require('semver')
 const { getLastMajorForMaster } = require('../get-last-major-for-master')
 const { GitProcess } = require('dugite')
 const { promisify } = require('util')
 
 const readFile = promisify(fs.readFile)
+const gitDir = path.resolve(__dirname, '..', '..')
 
 const getCurrentDate = () => {
   const d = new Date()
@@ -14,40 +16,22 @@ const getCurrentDate = () => {
   return `${yyyy}${mm}${dd}`
 }
 
-function sortBetaTags (tag1, tag2) {
-  const beta1 = parseInt(parseVersion(tag1)[3], 10)
-  const beta2 = parseInt(parseVersion(tag2)[3], 10)
-  return beta1 - beta2
-}
-
-const isStable = v => v.split('.').length === 3
-const isBeta = v => v.includes('beta')
 const isNightly = v => v.includes('nightly')
-
-function parseVersion (version) {
-  if (version[0] === 'v') {
-    version = version.slice(1)
-  }
-  const parts = version.split('.')
-  const len = parts.length
-  return len > 4 ? parts.slice(0, 4) : parts.concat(Array(4 - len).fill('0'))
+const isBeta = v => v.includes('beta')
+const isStable = v => {
+  v = semver.clean(v)
+  const validFormat = semver.valid(semver.coerce(v))
+  return validFormat ? (validFormat && v.split('.').length === 3) : false
 }
 
 async function nextBeta (v) {
-  const pv = parseVersion(v.split('-')[0])
-  const tagPattern = `v${pv[0]}.${pv[1]}.${pv[2]}-beta.*`
+  const next = semver.coerce(semver.clean(v))
 
-  const gitDir = path.resolve(__dirname, '..', '..')
-  const tagBlob = await GitProcess.exec(['tag', '--list', '-l', tagPattern], gitDir)
+  const tagBlob = await GitProcess.exec(['tag', '--list', '-l', `v${next}-beta.*`], gitDir)
   const tags = tagBlob.stdout.split('\n').filter(e => e !== '')
-  tags.sort(sortBetaTags)
+  tags.sort((t1, t2) => semver.gt(t1, t2))
 
-  if (tags.length === 0) {
-    return makeVersion(pv[0], pv[1], pv[2], 'beta.1')
-  }
-
-  const next = parseVersion(tags.pop())
-  return makeVersion([next[0], next[1], next[2], ++next[3]])
+  return tags.length === 0 ? semver.inc(next, 'beta', 'prerelease') : semver.inc(tags.pop(), 'prerelease')
 }
 
 async function getElectronVersion () {
@@ -57,47 +41,23 @@ async function getElectronVersion () {
 }
 
 async function nextNightly (v) {
-  const pv = parseVersion(v.split('-')[0])
-  let [major, minor, patch] = pv.slice(0, 3)
+  let next = semver.valid(semver.coerce(v))
   const pre = `nightly.${getCurrentDate()}`
-  if (isStable(v)) ++patch
 
-  const gitDir = path.resolve(__dirname, '..', '..')
+  if (isStable(v)) next = semver.inc(next, 'patch')
   const branch = await GitProcess.exec(['rev-parse', '--abbrev-ref', 'HEAD'], gitDir)
   if (branch === 'master') {
-    [major, minor, patch] = [await getLastMajorForMaster() + 1, '0', '0']
+    next = semver.inc(await getLastMajorForMaster(), 'major')
   }
 
-  return makeVersion([major, minor, patch, pre])
-}
-
-function nextStableFromPre (v) {
-  const pv = parseVersion(v.split('-')[0])
-  return makeVersion(pv.slice(0, 3))
-}
-
-function nextStableFromStable (v) {
-  const pv = parseVersion(v.split('-')[0])
-  let [major, minor, patch] = pv.slice(0, 3)
-  return makeVersion([major, minor, ++patch])
-}
-
-function makeVersion (parts) {
-  if (parts.length === 4) {
-    return `${parts[0]}.${parts[1]}.${parts[2]}-${parts[3]}`
-  }
-  return `${parts[0]}.${parts[1]}.${parts[2]}`
+  return `${next}-${pre}`
 }
 
 module.exports = {
   isStable,
   isBeta,
   isNightly,
-  parseVersion,
   nextBeta,
   getElectronVersion,
-  nextNightly,
-  nextStableFromPre,
-  nextStableFromStable,
-  makeVersion
+  nextNightly
 }

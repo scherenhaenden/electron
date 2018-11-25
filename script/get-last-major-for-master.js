@@ -17,10 +17,7 @@ async function getLastMajorForMaster () {
 
 function getNextReleaseBranch (branches) {
   const converted = branches.map(b => b.replace(/-/g, '.').replace('x', '0'))
-  const next = converted.reduce((v1, v2) => {
-    return semver.gt(v1, v2) ? v1 : v2
-  })
-  return parseInt(next.split('.')[0], 10)
+  return converted.reduce((v1, v2) => semver.gt(v1, v2) ? v1 : v2)
 }
 
 module.exports = { getLastMajorForMaster }

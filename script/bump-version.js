@@ -4,6 +4,7 @@ const { GitProcess } = require('dugite')
 const utils = require('./lib/version-utils')
 const plist = require('plist')
 const fs = require('fs')
+const semver = require('semver')
 const path = require('path')
 const { promisify } = require('util')
 const minimist = require('minimist')
@@ -21,12 +22,13 @@ function parseCommandLine () {
   })
   if (help || opts.help || !(opts.bump || opts.stable)) {
     console.log(`
-      Bump version numbers. Must specify at least one of the three options:\n
-        --bump=patch to increment patch version, or\n
-        --stable to promote current beta to stable, or\n
+      Bump release version number. Possible arguments:\n
+        --bump=patch to increment patch version\n
+        --stable to promote current beta to stable\n
         --version={version} to set version number directly\n
-      Note that you can use both --bump and --stable 
-      simultaneously.
+        --dryRun to print the next version without updating files
+      Note that you can use both --bump and --stable  simultaneously. 
+      Must specify at least one of [--bump | --stable | --version].
     `)
     process.exit(0)
   }
@@ -38,27 +40,28 @@ async function main () {
   const opts = parseCommandLine()
   const currentVersion = await utils.getElectronVersion()
   const version = await nextVersion(opts.bump, currentVersion)
-  const parts = utils.parseVersion(version.split('-')[0])
+  const components = semver.valid(semver.coerce(version)).split('.')
 
-  let suffix = ''
+  let pre
   if (version.includes('-')) {
-    suffix = `-${version.split('-')[1]}`
-    parts[3] = utils.parseVersion(version)[3]
+    pre = `-${version.split('-')[1]}`
+    components[3] = version.split('-')[1].split('.')[1]
   }
 
+  // print would-be new version and exit early
   if (opts.dryRun) {
     console.log(`new version number would be: ${version}\n`)
     return 0
   }
 
-  // update all related files
+  // update all version-related files
   await Promise.all([
     updateVersion(version),
     updateInfoPlist(version),
     updatePackageJSON(version),
     tagVersion(version),
-    updateVersionH(parts, suffix),
-    updateWinRC(parts)
+    updateVersionH(components, pre),
+    updateWinRC(components)
   ])
 
   console.log(`Bumped to version: ${version}`)
@@ -75,7 +78,7 @@ async function nextVersion (bumpType, version) {
         version = await utils.nextBeta(version)
         break
       case 'stable':
-        version = utils.nextStableFromPre(version)
+        version = semver.valid(semver.coerce(version))
         break
       default:
         throw new Error('Invalid bump type.')
@@ -88,7 +91,7 @@ async function nextVersion (bumpType, version) {
       case 'beta':
         throw new Error('Cannot bump to beta from stable.')
       case 'stable':
-        version = utils.nextStableFromStable(version)
+        version = semver.inc(version, 'patch')
         break
       default:
         throw new Error('Invalid bump type.')
@@ -137,33 +140,33 @@ async function tagVersion (version) {
 
 // updates atom_version.h file with new semver values
 // TODO(codebytere): auto-generate this
-async function updateVersionH (parts, suffix) {
+async function updateVersionH (components, pre) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'common', 'atom_version.h')
   const data = await readFile(filePath, 'utf8')
   const arr = data.split('\n')
   arr.forEach((item, idx) => {
     if (item.includes('#define ATOM_MAJOR_VERSION')) {
-      item = `#define ATOM_MAJOR_VERSION ${parts[0]}`
-      arr[idx + 1] = `#define ATOM_MINOR_VERSION ${parts[1]}`
-      arr[idx + 2] = `#define ATOM_PATCH_VERSION ${parts[2]}`
-      arr[idx + 4] = suffix ? `#define ATOM_PRE_RELEASE_VERSION ${suffix}` : '// #define ATOM_PRE_RELEASE_VERSION'
+      item = `#define ATOM_MAJOR_VERSION ${components[0]}`
+      arr[idx + 1] = `#define ATOM_MINOR_VERSION ${components[1]}`
+      arr[idx + 2] = `#define ATOM_PATCH_VERSION ${components[2]}`
+      arr[idx + 4] = pre ? `#define ATOM_PRE_RELEASE_VERSION ${pre}` : '// #define ATOM_PRE_RELEASE_VERSION'
     }
   })
   await writeFile(filePath, arr.join('\n'))
 }
 
 // updates atom.rc file with new semver values
-async function updateWinRC (parts) {
+async function updateWinRC (components) {
   const filePath = path.resolve(__dirname, '..', 'atom', 'browser', 'resources', 'win', 'atom.rc')
   const data = await readFile(filePath, 'utf8')
   const arr = data.split('\n')
   arr.forEach((line, idx) => {
     if (line.includes('FILEVERSION')) {
-      arr[idx] = ` FILEVERSION ${parts.join(',')}`
-      arr[idx + 1] = ` PRODUCTVERSION ${parts.join(',')}`
+      arr[idx] = ` FILEVERSION ${components.join(',')}`
+      arr[idx + 1] = ` PRODUCTVERSION ${components.join(',')}`
     } else if (line.includes('FILEVERSION')) {
-      arr[idx] = `            VALUE "FileVersion", "${parts.slice(0, 3).join('.')}"`
-      arr[idx + 5] = `            VALUE "ProductVersion", "${parts.slice(0, 3).join('.')}"`
+      arr[idx] = `            VALUE "FileVersion", "${components.slice(0, 3).join('.')}"`
+      arr[idx + 5] = `            VALUE "ProductVersion", "${components.slice(0, 3).join('.')}"`
     }
   })
   await writeFile(filePath, arr.join('\n'))
