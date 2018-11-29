@@ -1356,9 +1356,7 @@ describe('font fallback', () => {
   async function getRenderedFonts (html) {
     const w = new BrowserWindow({ show: false })
     try {
-      const loaded = emittedOnce(w.webContents, 'did-finish-load')
-      w.loadURL(`data:text/html,${html}`)
-      await loaded
+      await w.loadURL(`data:text/html,${html}`)
       w.webContents.debugger.attach()
       const sendCommand = (...args) => new Promise((resolve, reject) => {
         w.webContents.debugger.sendCommand(...args, (e, r) => {

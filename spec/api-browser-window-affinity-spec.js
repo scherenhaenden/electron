@@ -13,45 +13,34 @@ describe('BrowserWindow with affinity module', () => {
   const myAffinityNameUpper = 'MYAFFINITY'
   const anotherAffinityName = 'anotherAffinity'
 
-  function createWindowWithWebPrefs (webPrefs) {
-    return new Promise((resolve, reject) => {
-      const w = new BrowserWindow({
-        show: false,
-        width: 400,
-        height: 400,
-        webPreferences: webPrefs || {}
-      })
-      w.webContents.on('did-finish-load', () => { resolve(w) })
-      w.loadFile(path.join(fixtures, 'api', 'blank.html'))
+  async function createWindowWithWebPrefs (webPrefs) {
+    const w = new BrowserWindow({
+      show: false,
+      width: 400,
+      height: 400,
+      webPreferences: webPrefs || {}
     })
+    await w.loadFile(path.join(fixtures, 'api', 'blank.html'))
   }
 
   describe(`BrowserWindow with an affinity '${myAffinityName}'`, () => {
     let mAffinityWindow
-    before(done => {
-      createWindowWithWebPrefs({ affinity: myAffinityName })
-        .then((w) => {
-          mAffinityWindow = w
-          done()
-        })
+    before(async () => {
+      mAffinityWindow = await createWindowWithWebPrefs({ affinity: myAffinityName })
     })
 
-    after(done => {
-      closeWindow(mAffinityWindow, { assertSingleWindow: false }).then(() => {
-        mAffinityWindow = null
-        done()
-      })
+    after(async () => {
+      await closeWindow(mAffinityWindow, { assertSingleWindow: false })
+      mAffinityWindow = null
     })
 
-    it('should have a different process id than a default window', done => {
-      createWindowWithWebPrefs({})
-        .then(w => {
-          const affinityID = mAffinityWindow.webContents.getOSProcessId()
-          const wcID = w.webContents.getOSProcessId()
+    it('should have a different process id than a default window', async () => {
+      const w = await createWindowWithWebPrefs({})
+      const affinityID = mAffinityWindow.webContents.getOSProcessId()
+      const wcID = w.webContents.getOSProcessId()
 
-          expect(affinityID).to.not.equal(wcID, 'Should have different OS process IDs')
-          closeWindow(w, { assertSingleWindow: false }).then(() => { done() })
-        })
+      expect(affinityID).to.not.equal(wcID, 'Should have different OS process IDs')
+      await closeWindow(w, { assertSingleWindow: false })
     })
 
     it(`should have a different process id than a window with a different affinity '${anotherAffinityName}'`, done => {

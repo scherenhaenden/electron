@@ -157,7 +157,7 @@ describe('BrowserWindow module', () => {
     })
 
     it('should emit unload handler', (done) => {
-      w.webContents.on('did-finish-load', () => { w.close() })
+      w.webContents.once('did-finish-load', () => { w.close() })
       w.once('closed', () => {
         const test = path.join(fixtures, 'api', 'unload')
         const content = fs.readFileSync(test)
@@ -169,7 +169,7 @@ describe('BrowserWindow module', () => {
     })
     it('should emit beforeunload handler', (done) => {
       w.once('onbeforeunload', () => { done() })
-      w.webContents.on('did-finish-load', () => { w.close() })
+      w.webContents.once('did-finish-load', () => { w.close() })
       w.loadFile(path.join(fixtures, 'api', 'beforeunload-false.html'))
     })
     it('should not crash when invoked synchronously inside navigation observer', (done) => {
@@ -290,46 +290,47 @@ describe('BrowserWindow module', () => {
     describe('POST navigations', () => {
       afterEach(() => { w.webContents.session.webRequest.onBeforeSendHeaders(null) })
 
-      it('supports specifying POST data', (done) => {
-        w.webContents.on('did-finish-load', () => done())
-        w.loadURL(server.url, { postData: postData })
+      it('supports specifying POST data', async () => {
+        await w.loadURL(server.url, { postData: postData })
       })
-      it('sets the content type header on URL encoded forms', (done) => {
-        w.webContents.on('did-finish-load', () => {
+      it('sets the content type header on URL encoded forms', async () => {
+        await w.loadURL(server.url)
+        const requestDetails = new Promise(resolve => {
           w.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
-            assert.strictEqual(details.requestHeaders['content-type'], 'application/x-www-form-urlencoded')
-            done()
+            resolve(details)
           })
-          w.webContents.executeJavaScript(`
-            form = document.createElement('form')
-            document.body.appendChild(form)
-            form.method = 'POST'
-            form.target = '_blank'
-            form.submit()
-          `)
         })
-        w.loadURL(server.url)
+        w.webContents.executeJavaScript(`
+          form = document.createElement('form')
+          document.body.appendChild(form)
+          form.method = 'POST'
+          form.target = '_blank'
+          form.submit()
+        `)
+        const details = await requestDetails
+        assert.strictEqual(details.requestHeaders['content-type'], 'application/x-www-form-urlencoded')
       })
-      it('sets the content type header on multi part forms', (done) => {
-        w.webContents.on('did-finish-load', () => {
+      it('sets the content type header on multi part forms', async () => {
+        await w.loadURL(server.url)
+        const requestDetails = new Promise(resolve => {
           w.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
-            assert(details.requestHeaders['content-type'].startsWith('multipart/form-data; boundary=----WebKitFormBoundary'))
-            done()
+            resolve(details)
           })
-          w.webContents.executeJavaScript(`
-            form = document.createElement('form')
-            document.body.appendChild(form)
-            form.method = 'POST'
-            form.target = '_blank'
-            form.enctype = 'multipart/form-data'
-            file = document.createElement('input')
-            file.type = 'file'
-            file.name = 'file'
-            form.appendChild(file)
-            form.submit()
-          `)
         })
-        w.loadURL(server.url)
+        w.webContents.executeJavaScript(`
+          form = document.createElement('form')
+          document.body.appendChild(form)
+          form.method = 'POST'
+          form.target = '_blank'
+          form.enctype = 'multipart/form-data'
+          file = document.createElement('input')
+          file.type = 'file'
+          file.name = 'file'
+          form.appendChild(file)
+          form.submit()
+        `)
+        const details = await requestDetails
+        assert(details.requestHeaders['content-type'].startsWith('multipart/form-data; boundary=----WebKitFormBoundary'))
       })
     })
 
@@ -2400,7 +2401,6 @@ describe('BrowserWindow module', () => {
       let called = false
       let gotInitialFullSizeFrame = false
       const [contentWidth, contentHeight] = w.getContentSize()
-      w.loadFile(path.join(fixtures, 'api', 'frame-subscriber.html'))
       w.webContents.on('did-finish-load', () => {
         w.webContents.beginFrameSubscription(true, (data, rect) => {
           if (data.length === 0) {
@@ -2429,6 +2429,7 @@ describe('BrowserWindow module', () => {
           done()
         })
       })
+      w.loadFile(path.join(fixtures, 'api', 'frame-subscriber.html'))
     })
     it('throws error when subscriber is not well defined', (done) => {
       w.loadFile(path.join(fixtures, 'api', 'frame-subscriber.html'))
@@ -2458,17 +2459,17 @@ describe('BrowserWindow module', () => {
       }
     })
 
-    it('should save page to disk', (done) => {
-      w.webContents.on('did-finish-load', () => {
+    it('should save page to disk', async () => {
+      await w.loadFile(path.join(fixtures, 'pages', 'save_page', 'index.html'))
+      const error = await new Promise(resolve => {
         w.webContents.savePage(savePageHtmlPath, 'HTMLComplete', function (error) {
-          assert.strictEqual(error, null)
-          assert(fs.existsSync(savePageHtmlPath))
-          assert(fs.existsSync(savePageJsPath))
-          assert(fs.existsSync(savePageCssPath))
-          done()
+          resolve(error)
         })
       })
-      w.loadFile(path.join(fixtures, 'pages', 'save_page', 'index.html'))
+      expect(error).to.be.null;
+      assert(fs.existsSync(savePageHtmlPath))
+      assert(fs.existsSync(savePageJsPath))
+      assert(fs.existsSync(savePageCssPath))
     })
   })
 
@@ -3432,9 +3433,7 @@ describe('BrowserWindow module', () => {
       assert.deepStrictEqual(data, expectedContextData)
     })
     it('recreates the contexts on reload', async () => {
-      const loaded = emittedOnce(iw.webContents, 'did-finish-load')
-      iw.loadFile(path.join(fixtures, 'api', 'isolated.html'))
-      await loaded
+      await iw.loadFile(path.join(fixtures, 'api', 'isolated.html'))
       const isolatedWorld = emittedOnce(ipcMain, 'isolated-world')
       iw.webContents.reload()
       const [, data] = await isolatedWorld
@@ -3453,9 +3452,7 @@ describe('BrowserWindow module', () => {
       assert.deepStrictEqual(data, expectedContextData)
     })
     it('recreates the contexts on reload with sandbox on', async () => {
-      const loaded = emittedOnce(ws.webContents, 'did-finish-load')
-      ws.loadFile(path.join(fixtures, 'api', 'isolated.html'))
-      await loaded
+      await ws.loadFile(path.join(fixtures, 'api', 'isolated.html'))
       const isolatedWorld = emittedOnce(ipcMain, 'isolated-world')
       ws.webContents.reload()
       const [, data] = await isolatedWorld
